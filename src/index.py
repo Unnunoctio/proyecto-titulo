@@ -1,56 +1,86 @@
-import os
-import re
-
-from llm_models.class_deepseek_llm import Deepseek_LLM
+from experts.generic import GenericExpert
+from llm_models.class_openia_llm import Openia_LLM
 
 PROBLEM = """
-Una empresa desea optimizar la disposición de diversos paquetes rectangulares dentro de contenedores rectangulares, con el objetivo de minimizar la cantidad de contenedores utilizados.
-Cada paquete posee un ancho y una altura determinados, y debe ser ubicado completamente dentro de un único contenedor, sin superponerse con otros paquetes.
-El objetivo es determinar la asignación y la posición de cada paquete dentro de los contenedores, cumpliendo con las siguientes condiciones:
-- Cada paquete debe estar completamente contenido dentro de un contenedor.
-- No debe existir superposición entre paquetes.
-- Los paquetes no pueden ser rotados.
-- Se debe minimizar la cantidad total de contenedores utilizados.
+Para el SCP, tenemos un conjunto de n elementos al que llamaremos U, y una cantidad de m
+subconjuntos a los que llamaremos S_i, con i = {1, 2, 3, ..., m}, donde queremos una unión de
+subconjuntos S, tal que el costo total de esos subconjuntos sea el mínimo y todos los elementos de
+U estén cubiertos por al menos un subconjunto S. En base a esto podemos formular el siguiente
+modelo:
 
-La información de entrada se proporcionará mediante un archivo de texto (.txt) llamado "instance.txt" en la carpeta "instances", con el siguiente formato:
-<cantidad_de_paquetes>
-<ancho_1> <alto_1>
-<ancho_2> <alto_2>
-...
-<ancho_n> <alto_n>
+Parámetros:
+    n: Número de elementos en U.
+    m: Número de subconjuntos.
+    ci: costo del subconjunto Si.
+    aji: indica si el elemento j se encuentra en el subconjunto i.
 
-<cantidad_de_contenedores>
-<ancho_1> <alto_1>
-<ancho_2> <alto_2>
-...
-<ancho_m> <alto_m>
+Variable de decisión:
+    xi: Variable binaria que indica si el subconjunto Si es parte de la solución (1 si es que forma parte, 0 en caso contrario).
+
+Función Objetivo:
+    Max z = sum(c_i * x_i)(i=1, m)
+
+S.t.:
+    sum(a_ji * x_i)(i=1, n)>=1, j ∈ {1, 2, ..., m}
+    xi ∈ {0, 1}, i ∈ {1, 2, ..., n}
+
+Instancias:
+*Las instancias se encuentran en el archivo instances/instance.txt.*
+
+Existen diversas formas de representar las instancias del SCP. Una manera bastante utilizada en
+la literatura es el formato disponible en la OR-Library, un repositorio de varias instancias para
+distintos problemas de optimización. El formato se muestra a continuación.
+
+Para una instancia de de 200 elementos (n) y 1000 subconjuntos (m), tenemos la siguiente estructura:
+Primera parte de la representación
+200 1000
+El primer valor indica los elementos del conjunto U, y el segundo indica la cantidad total de
+subconjuntos. Luego, tenemos:
+Segunda parte de la representación
+1 1 1 1 1 1 1 1 1 1 1 1
+2 2 2 2 2 2 2 2 2 2 2 2
+2 2 2 3 3 3 3 3 3 3 3 3
+3 3 3 3 3 3 4 4 4 4 4 4
+4 4 4 4 4 4 4 4 5 5 5 5
+5 5 5 5 5 6 6 6 6 6 6 6
+6 6 6 6 7 7 7 7 7 7 7 7
+7 7 7 8 8 8 8 8 8 8 8 8
+8 9 9 9 9 9 9 9 9 10 10 10
+10 10 10 10 10 10 11 11 11 11 11 11
+11 12 12 12 12 12 12 12 12 12 12 12
+12 12 12 13 13 13 13 13 13 13 13 14
+14 14 14 14 14 14 14 14 14 14 14 14
+14 15 15 15 15 15 15 15 15 15 15 15
+15 15 15 15 15 16 16 16 16 16 16 17
+17 17 17 17 18 18 18 18 18 18 18 18
+18 18 18 18 18 19 19 19 19 19 19 19
+20 20 20 20 20 20 20 20 20 20 20 20
+20 21 21 21 21 21 21 21 21 22 22 22
+22 22 22 22 22 22 22 23 23 23 23 23
+23 23 23 23 23 23 24 24 24 24 24 24
+... 100
+La segunda parte del archivo muestra los costos c_i de cada subconjunto S_i, en este caso, 1000
+valores. Por último, se muestra lo siguiente:
+Tercera parte de la representación
+17
+91 214 230 289 351 416 488 491 518 567 720 721
+735 753 768 928 990
+18
+22 47 99 192 299 322 340 500 619 628 640 663
+709 736 796 844 930 970
+26
+2 37 56 115 151 160 178 182 218 228 345 388
+587 588 607 614 629 635 636 673 757 793 800 849
+873 929
+Para la tercera parte del archivo, estamos viendo los primeros 3 elementos del conjunto U, y lo que
+nos indica el archivo es lo siguiente:
+- Para el primer elemento, la fila que contiene un solo valor indica que el elemento esta cubierto
+por 17 subconjuntos.
+- Luego de eso, vienen 17 valores que indican cuales son los subconjuntos que contienen el
+primer elemento.
+- Para el segundo y tercer elemento, indica que aparecen en 18 y 26 subconjuntos respectivamente.
+- Y además muestran los subconjuntos correspondientes a cada elemento.
 """
 
-output_schema = Deepseek_LLM().generate_output_schema(PROBLEM)
-print(output_schema)
-print("\n-----------------------------------")
-first_problems_prompts = Deepseek_LLM().generate_first_problems_prompts(PROBLEM, output_schema)
-
-generation = 1
-counter = 1
-for prompt in first_problems_prompts:
-    prompt = f"""
-        ------------PROBLEM-------------
-        {PROBLEM}
-        ------------PROMPT-------------
-        {prompt}
-    """
-    generated_code = Deepseek_LLM().generate_code(prompt)
-
-    match = re.search(r"```python\n(.*?)```", generated_code, re.DOTALL)
-    code = match.group(1) if match else generated_code
-
-    file_name = f"generations/gen-{generation}-code-{counter}.py"
-
-    if not os.path.exists("generations"):
-        os.makedirs("generations")
-
-    with open(file_name, "w") as f:
-        f.write(code)
-
-    counter += 1
+openai_model = Openia_LLM()
+GenericExpert(openai_model).run_expert(PROBLEM)
