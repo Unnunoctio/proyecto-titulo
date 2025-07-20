@@ -26,3 +26,11 @@ class LLM(ABC):
     @abstractmethod
     def generate_code(self, problem: str, prompt: str, output_schema: str, inspiration: Optional[str] = None) -> str:
         pass
+    
+    @abstractmethod
+    def generate_prompt_evolution(self, problem: str, code: str) -> str:
+        pass
+    
+    @abstractmethod
+    def generate_evolution_code(self, problem: str, output_schema: str, code: str, list_improvements: str) -> str:
+        pass

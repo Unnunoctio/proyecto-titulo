@@ -2,8 +2,9 @@ import ast
 import functools
 import time
 from typing import List
+import re
 
-from config import COUNT_FIRST_PROBLEMS, COUNT_SELECTION_CODES, MAX_EPOCHS
+from config import COUNT_FIRST_PROBLEMS, COUNT_SELECTION_CODES, MAX_EPOCHS, COUNT_EVOLUTION_CODES
 from llm_models.class_llm import LLM
 from utils.create_venv import create_venv
 from utils.delete_files import delete_files, delete_folder
@@ -11,6 +12,7 @@ from utils.dependencies import process_code_and_install_dependencies
 from utils.move_file import move_file
 from utils.run_code import run_code
 from utils.save_code import save_code
+from utils.copy_file import copy_file
 
 
 class GenericExpert:
@@ -19,6 +21,8 @@ class GenericExpert:
         self.output_schema = None
 
     def run_expert(self, problem):
+        errors = []
+
         self.generate_solution_artifacts(problem)
         file_names = self.generate_first_generation(problem)
 
@@ -27,38 +31,42 @@ class GenericExpert:
         best_scores = []
         while True:
             output_scores, result_errors, timeout_errors, restriction_errors = self.run_generation(file_names)
-            print(f"RESULTS ERRORS: {len(result_errors)}")
-            print(f"TIMEOUT ERRORS: {len(timeout_errors)}")
-            print(f"RESTRICTION ERRORS: {len(restriction_errors)}")
+            errors.append({
+                "epoch": epoch,
+                "result_errors": len(result_errors),
+                "timeout_errors": len(timeout_errors),
+                "restriction_errors": len(restriction_errors)
+            })
 
-            print("SCORES")
-            for score in output_scores:
-                print("--------------------------------")
-                print(f"File: {score['file_code']}\nScore: {score['score']}\nTime: {score['time']} seconds")
+            print(f"Epoch {epoch}: {len(result_errors)} result errors, {len(timeout_errors)} timeout errors, {len(restriction_errors)} restriction errors")
+
+            ##? file_names = file_names + [best_score['file_code'] for best_score in best_scores]
+
+            ##? best_score_epoch = self.select_best_score(output_scores)
+            ##? if best_score_epoch is not None:
+            ##?     copy_file(f"generations/{best_score_epoch['file_code']}", f"output/{best_score_epoch['file_code']}")
+            ##TODO
+            for output_score in output_scores:
+                copy_file(f"generations/{output_score['file_code']}", f"output/{output_score['file_code']}")
 
             epoch += 1
             if epoch > MAX_EPOCHS:
-                best_score = self.select_best_score(output_scores + best_scores)
+            ##?     best_score = self.select_best_score(output_scores + best_scores)
                 break
 
             # Seleccionar mejores scores
-            best_scores = self.select_best_scores(output_scores + best_scores)
-            # ELIMINA LOS CODIGOS QUE NO SEAN LOS MEJORES
+            ##? best_scores = self.select_best_scores(output_scores + best_scores)
+            ##TODO
+            best_scores = output_scores
+            # ELIMINA LOS CODIGOS QUE NO SEAN LOS best_scores
+            delete_files("generations", [x for x in file_names if x not in [best_score['file_code'] for best_score in best_scores]])
             # EVOLUCIONA X VECES CADA UNO DE LOS MEJORES
-            # GENERA EL NUEVO FILE NAMES
+            file_names = self.generate_evolution_generation(best_scores, epoch, problem)
 
-        # PRINT BEST SCORE
-        if best_score is None:
-            print("No solution found")
-        else:
-            print("-------------------------")
-            print("Best Solution")
-            print(f"Score: {best_score['score']}")
-            print(f"Time: {best_score['time']} seconds")
-            print("-------------------------")
+        ##? self.clear_files(best_score["file_code"], [x for x in file_names if x != best_score['file_code']])
+        self.clear_files("", [x for x in file_names if x != ""])
 
-        self.clear_files(best_score["file_code"], [x for x in file_names if x != best_score['file_code']])
-
+        return best_score, errors
 
     def generate_solution_artifacts(self, problem):
         try:
@@ -112,7 +120,7 @@ class GenericExpert:
             for prompt in first_problems_prompts:
                 counter += 1
                 # File name
-                file_name = f"gen-1-code-{counter}.py"
+                file_name = f"alg-{counter}-gen-1.py"
 
                 # Generate code
                 generated_code = self.LLModel.generate_code(problem, prompt, self.output_schema)
@@ -128,6 +136,32 @@ class GenericExpert:
             print(f"Error generating code: {e}")
             raise e
 
+    def generate_evolution_generation(self, best_scores, epoch, problem):
+        file_names = []
+        patron = r'gen-(\d+)'
+        for best_score in best_scores:
+            # Evolution generation
+            with open(f"generations/{best_score['file_code']}", "r") as f:
+                pre_code = f.read()
+                
+                # Generate improvements
+                improvements = self.LLModel.generate_prompt_evolution(problem, pre_code)
+
+                for _ in range(COUNT_EVOLUTION_CODES):
+                    # File name
+                    file_name = re.sub(patron, f'gen-{epoch}', best_score['file_code'])
+
+                    # Generate code
+                    generated_code = self.LLModel.generate_evolution_code(problem, self.output_schema, pre_code, improvements)
+                    save_code("generations", file_name, generated_code)
+
+                    # Process code and install dependencies
+                    process_code_and_install_dependencies(generated_code, "generations")
+
+                    file_names.append(file_name)
+        
+        return file_names
+                    
     def run_generation(self, file_names) -> List:
         from generated.restrictions import validate_restrictions
         from generated.target_function import target_function
@@ -164,8 +198,11 @@ class GenericExpert:
                 continue
 
             # Compute target function score
-            score = target_function(result_dict)
-            output_scores.append({"file_code": file_name, "score": score, "time": end_time - start_time})
+            try:
+                score = target_function(result_dict)
+                output_scores.append({"file_code": file_name, "score": score, "time": end_time - start_time})
+            except Exception as e:
+                result_errors.append({"file_code": file_name, "error": e})
 
         return output_scores, result_errors, timeout_errors, restriction_errors
 
@@ -178,11 +215,7 @@ class GenericExpert:
 
         sorted_scores = sorted(scores, key=functools.cmp_to_key(compare))
 
-        selected_codes = []
-        for i in range(COUNT_SELECTION_CODES):
-            selected_codes.append(sorted_scores[i])
-
-        return selected_codes
+        return sorted_scores[:COUNT_SELECTION_CODES]
 
     def select_best_score(self, scores):
         def compare(a, b):
@@ -199,8 +232,8 @@ class GenericExpert:
 
     def clear_files(self, best_file_name, file_names):
         # MUEVE output_schema.py y el mejor codigo a la carpeta output
-        move_file("generations/output_schema.py", "output/output_schema.py")
-        move_file(f"generations/{best_file_name}", "output/best_code.py")
+        ##? move_file("generations/output_schema.py", "output/output_schema.py")
+        ##? move_file(f"generations/{best_file_name}", "output/best_code.py")
 
         # ELIMINA LOS CODIGOS
         delete_files("generations", file_names)

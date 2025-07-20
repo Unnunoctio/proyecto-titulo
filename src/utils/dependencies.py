@@ -1,29 +1,6 @@
-import ast
 import os
 import re
 import subprocess
-
-
-def detect_dependencies(code):
-    dependencies = set()
-
-    try:
-        tree = ast.parse(code)
-
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    module = alias.name.split(".")[0]
-                    dependencies.add(module)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    module = node.module.split(".")[0]
-                    dependencies.add(module)
-
-        return list(dependencies)
-    except Exception as e:
-        print(f"Error detecting dependencies: {e}, using regex method")
-        return detect_dependencies_regex(code)
 
 
 def detect_dependencies_regex(code):
@@ -111,6 +88,14 @@ def filter_dependencies_builtin(dependencies):
         "cgi",
         "cgitb",
         "wsgiref",
+        "heapq",
+        "bisect",
+        "queue",
+        "enum",
+        "decimal",
+        "fractions",
+        "statistics",
+        "secrets",
     }
 
     dependencies_to_install = [dep for dep in dependencies if dep not in builtin_modules]
@@ -126,6 +111,56 @@ def filter_dependencies_builtin(dependencies):
 def mapping_dependencies(dependency):
     mapping = {"cv2": "opencv-python", "PIL": "Pillow", "sklearn": "scikit-learn", "yaml": "PyYAML", "bs4": "beautifulsoup4", "requests_oauthlib": "requests-oauthlib", "jwt": "PyJWT", "dateutil": "python-dateutil", "serial": "pyserial", "win32api": "pywin32", "psutil": "psutil", "lxml": "lxml"}
     return mapping.get(dependency, dependency)
+
+
+def check_package_installed(package_name, venv_path):
+    """
+    Verifica si un paquete está instalado en el entorno virtual.
+    """
+    if os.name == "nt":
+        pip_exe = os.path.join(venv_path, "Scripts", "pip.exe")
+    else:
+        pip_exe = os.path.join(venv_path, "bin", "pip")
+
+    if not os.path.exists(pip_exe):
+        return False
+
+    try:
+        # Usar pip show para verificar si el paquete está instalado
+        result = subprocess.run(
+            [pip_exe, "show", package_name], 
+            capture_output=True, 
+            text=True, 
+            timeout=30
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def filter_already_installed(dependencies, venv_path):
+    """
+    Filtra las dependencias que ya están instaladas en el entorno virtual.
+    """
+    not_installed = []
+    already_installed = []
+    
+    for dep in dependencies:
+        dep_package = mapping_dependencies(dep)
+        if check_package_installed(dep_package, venv_path):
+            already_installed.append(dep)
+        else:
+            not_installed.append(dep)
+    
+    if already_installed:
+        print(f"Already installed (skipping): {already_installed}")
+    
+    if not_installed:
+        print(f"Need to install: {not_installed}")
+    else:
+        print("All dependencies are already installed")
+    
+    return not_installed
 
 
 def install_dependencies(dependencies, venv_path):
@@ -147,13 +182,17 @@ def install_dependencies(dependencies, venv_path):
     for dep in dependencies:
         dep_package = mapping_dependencies(dep)
         try:
+            print(f"Installing {dep_package}...")
             subprocess.run([pip_exe, "install", dep_package], capture_output=True, text=True, check=True, timeout=120)
             correct_installed.append(dep)
         except subprocess.TimeoutExpired:
+            print(f"Timeout installing {dep_package}")
             incorrect_installed.append(dep)
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            print(f"Error installing {dep_package}: {e}")
             incorrect_installed.append(dep)
-        except Exception:
+        except Exception as e:
+            print(f"Unexpected error installing {dep_package}: {e}")
             incorrect_installed.append(dep)
 
     print(f"Correctly installed: {correct_installed}")
@@ -164,7 +203,7 @@ def install_dependencies(dependencies, venv_path):
 
 
 def process_code_and_install_dependencies(code, file_path):
-    dependencies = detect_dependencies(code)
+    dependencies = detect_dependencies_regex(code)
     dependencies_to_install = filter_dependencies_builtin(dependencies)
     if not dependencies_to_install:
         return
@@ -174,5 +213,11 @@ def process_code_and_install_dependencies(code, file_path):
         print(f"Dont exists venv at {venv_path}")
         return
 
-    print(f"Installing dependencies to {venv_path}")
-    install_dependencies(dependencies_to_install, venv_path)
+    # Nueva funcionalidad: filtrar dependencias ya instaladas
+    dependencies_not_installed = filter_already_installed(dependencies_to_install, venv_path)
+    
+    # Solo instalar las que no están instaladas
+    if dependencies_not_installed:
+        install_dependencies(dependencies_not_installed, venv_path)
+    else:
+        print("No new dependencies to install")

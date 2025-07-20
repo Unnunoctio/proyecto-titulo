@@ -83,4 +83,22 @@ primer elemento.
 """
 
 openai_model = Openia_LLM()
-GenericExpert(openai_model).run_expert(PROBLEM)
+best_score, errors = GenericExpert(openai_model).run_expert(PROBLEM)
+
+# PRINT BEST SCORE
+if best_score is None:
+    print("No solution found")
+else:
+    print("-------------------------")
+    print("Best Solution")
+    print(f"Score: {best_score['score']}")
+    print(f"Time: {best_score['time']} seconds")
+    print("-------------------------")
+
+print("Errors in each epoch:")
+for error in errors:
+    print(f"Epoch {error['epoch']}:")
+    print(f"Result errors: {error['result_errors']}")
+    print(f"Timeout errors: {error['timeout_errors']}")
+    print(f"Restriction errors: {error['restriction_errors']}")
+    print("-------------------------")

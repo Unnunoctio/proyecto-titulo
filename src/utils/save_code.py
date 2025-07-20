@@ -11,7 +11,7 @@ def save_code(folder_path: str, file_name: str, content: str) -> Tuple[bool, Opt
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        with open(os.path.join(folder_path, file_name), "w") as f:
+        with open(os.path.join(folder_path, file_name), "w", encoding="utf-8") as f:
             f.write(code)
 
         return True, None

@@ -1,6 +1,7 @@
 import os
 import subprocess
 from typing import Optional, Tuple
+from config import RUN_CODE_TIMEOUT
 
 
 def run_code(folder_path: str, file_name: str) -> Tuple[str, bool, Optional[Exception]]:
@@ -29,7 +30,7 @@ def run_code(folder_path: str, file_name: str) -> Tuple[str, bool, Optional[Exce
             [python_exe, script_path],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=RUN_CODE_TIMEOUT
         )
         
         if result.returncode != 0:

@@ -1,3 +1,8 @@
+# Generation Files
+output/*.py
+instances/*.py
+generations/*.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
