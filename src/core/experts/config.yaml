@@ -1,0 +1,9 @@
+experts:
+  - name: "Generic"
+    type: "API" # API | Local
+    library: "openai" 
+    api-key: "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"
+    standard-model: "gpt-4.1-mini"
+    coding-model: "gpt-4.1"
+    reasoning-model: "gpt-4o-mini"
+      
