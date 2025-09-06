@@ -6,5 +6,5 @@ class APIBaseLLM(ABC):
         self.api_key = api_key
 
     @abstractmethod
-    def generate(self, model: str, system_prompt: str, user_prompt: str, temperature: float = 0.0) -> str:
+    def generate(self, model: str, system_prompt: str, user_prompt: str, temperature: float = 0.0, top_p: float = 1.0) -> str:
         pass

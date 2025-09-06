@@ -67,8 +67,9 @@ problem:
       * Y además muestran los subconjuntos correspondientes a cada elemento.
 
 generation:
-  first-generation-size: 15
-  max-epochs: 10
+  first-generation-size: 10
+  max-epochs: 5
   evolution-strategy: "individual" # "individual" | "cross"
-  selection-strategy: "best-by-solution" # "best-by-solution" | "best-by-epoch"
+  selection-strategy: "best-by-solution" # "best-by-solution" | "all-by-solution"
   timeout: 30 # seconds
+  max-errors-resolved: 3 # max number of errors resolved in a single generation
