@@ -42,6 +42,7 @@ class APIBaseExpert():
             target_function=None
         )
 
+        print("Generating artifacts...")
         # Generate artifacts
         self._generate_output_schema()
         self._generate_constraints_function()
@@ -176,18 +177,16 @@ class APIBaseExpert():
                         codes_to_run.append(evolved_code)
 
         #     #! # Save the result
-        #     #! CodeExecutor.save_code(file_name="output_schema.py", code=self.artifacts_generated.output_schema)
-        #     #! CodeExecutor.save_code(file_name="constraints_function.py", code=self.artifacts_generated.constraints_function)
 
-        #     #! code_list = []
-        #     #! for code_id, code_obj in self.generation_run.generations.items():
-        #     #!     code_dict = asdict(code_obj)
-        #     #!     code_list.append(code_dict)
+        code_list = []
+        for code_id, code_obj in self.generation_run.generations.items():
+            code_dict = asdict(code_obj)
+            code_list.append(code_dict)
 
 
-        #     #! # Convertir a string antes de escribir
-        #     #! with open(os.path.join("src", "data", "results.txt"), "w", encoding="utf-8") as f:
-        #     #!     f.write(str(code_list))
+        # Convertir a string antes de escribir
+        with open(os.path.join("src", "data", "results_binpack1_15_15_individual_best.txt"), "w", encoding="utf-8") as f:
+            f.write(str(code_list))
         #     #!
 
     def _generate_output_schema(self) -> None:
@@ -246,7 +245,7 @@ class APIBaseExpert():
 
     def _generate_constraints_function(self) -> None:
         # Get constraints list from problem
-        system_prompt = f"""
+        system_prompt = """
             You are an expert constraint analyst. Your task is to identify and prioritize all constraints from problem descriptions.
 
             ANALYSIS APPROACH:
@@ -299,7 +298,7 @@ class APIBaseExpert():
         constraints_list = self.llm.generate(model=self.reasoning_model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.3, top_p=0.95)
 
         # Generate the constraints function
-        system_prompt = f""""
+        system_prompt = """"
             You are an expert Python developer specializing in constraint validation systems. Your task is to generate robust validation functions.
 
             CORE REQUIREMENTS:
@@ -382,7 +381,7 @@ class APIBaseExpert():
         self.artifacts_generated.constraints_function = code
 
     def _generate_target_function(self) -> None:
-        system_prompt = f"""
+        system_prompt = """
             You are tasked with creating a Python evaluation function that determines the best solution among multiple solution candidates.
             Write a complete and executable Python 3 function named `target_function` with the following specifications:
 
@@ -399,26 +398,8 @@ class APIBaseExpert():
             - Must return the code_id (str) of the best performing solution
 
             EVALUATION CRITERIA (implement a comprehensive scoring system):
-            1. **Result Quality (60% weight)**: Evaluate how well the result satisfies the problem requirements
-            - Correctness of output format according to input_schema
-            - Accuracy of solution relative to problem objectives
-            - Completeness of the solution
-            - Edge case handling
-
-            2. **Performance Efficiency (25% weight)**: Consider execution performance
-            - Execution time (faster is better, but within reasonable bounds)
-            - Time complexity implications
-            - Resource utilization efficiency
-
-            3. **Solution Robustness (10% weight)**: Assess solution reliability
-            - Error handling (penalize solutions with errors heavily)
-            - Code stability and version maturity
-            - Solution approach appropriateness
-
-            4. **Evolutionary Quality (5% weight)**: Consider evolutionary aspects
-            - Generation progression (later epochs may indicate refinement)
-            - Version stability (higher versions may indicate bug fixes)
-            - Solution type effectiveness for the problem domain
+            1. Evaluate the solution value is a better solution than the others respect to the problem objectives
+            2. is a solution value is the same, the solution with the smallest execution time is the best
 
             IMPLEMENTATION REQUIREMENTS:
             - Use try-catch blocks for robust error handling
@@ -443,11 +424,11 @@ class APIBaseExpert():
             {self.generation_run.problem.objective}
 
             INPUT SCHEMA:
-            {{
+            [{{
                 "code_id": str,
                 "result": {self.artifacts_generated.output_schema},
                 "execution_time": float,
-            }}
+            }}, ...]
 
             ---
             Generate the target_function that evaluates the solutions and returns the best solution code_id.
@@ -463,7 +444,7 @@ class APIBaseExpert():
         self.artifacts_generated.target_function = code
 
     def _generate_first_generation(self) -> None:
-        system_prompt = f"""
+        system_prompt = """
             You are an expert problem-solving assistant. Your task is to identify the best solution approach for the problem.
 
             ANALYSIS APPROACH:
@@ -586,7 +567,7 @@ class APIBaseExpert():
             self.generation_run.generations[solution_code_generated.code_id] = solution_code_generated
     
     def _generate_solution_code(self, user_prompt: str) -> str:
-        system_prompt = f"""
+        system_prompt = """
             You are an expert Python developer specializing in algorithmic problem solving.
 
             CRITICAL REQUIREMENTS:
@@ -745,7 +726,7 @@ class APIBaseExpert():
         return fix_codes
 
     def _evo_individual_generation(self, code_to_evolve: CodeGenerated, epoch: int) -> Optional[CodeGenerated]:
-        system_prompt = f"""
+        system_prompt = """
             You are an expert code optimization consultant specializing in algorithmic problem solving and performance improvement.
             Your task is to analyze Python code that is not meeting its objective function requirements and provide a comprehensive improvement plan.
 

@@ -1,5 +1,6 @@
 # Deprecated
 deprecated/
+test/
 
 # Generation Files
 output/*.py

@@ -138,7 +138,7 @@ class CodeExecutor:
         try:
             # Usar pip show para verificar si el paquete está instalado
             result = subprocess.run(
-                [pip_exe, "show", package_name], 
+                [pip_exe, "show", package], 
                 capture_output=True, 
                 text=True, 
                 timeout=30
@@ -281,12 +281,14 @@ class CodeExecutor:
     @classmethod
     def execute_function_memory(cls, function_code: str, function_name:str, data: Dict):
         try:
-            # Create a namespace for the function
-            execution_namespace = {}
-            exec(function_code, globals(), execution_namespace)
+            # # Create a namespace for the function
+            # execution_namespace = {}
+            # exec(function_code, globals(), execution_namespace)
 
-            # Call the function
-            result = execution_namespace[function_name](data)
+            # # Call the function
+            # result = execution_namespace[function_name](data)
+            exec(function_code, globals())
+            result = globals()[function_name](data)
             return result
         except Exception as e:
             print(f"Error executing function: {e}")
