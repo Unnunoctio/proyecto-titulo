@@ -185,7 +185,7 @@ class APIBaseExpert():
 
 
         # Convertir a string antes de escribir
-        with open(os.path.join("src", "data", "results_binpack1_15_15_individual_best.txt"), "w", encoding="utf-8") as f:
+        with open(os.path.join("src", "data", "results_binpack1_v2_5_5_individual_best.txt"), "w", encoding="utf-8") as f:
             f.write(str(code_list))
         #     #!
 
@@ -230,12 +230,15 @@ class APIBaseExpert():
             OBJECTIVE:
             {self.generation_run.problem.objective}
 
+            CONSTRAINTS:
+            {self.generation_run.problem.constraints}
+
             ---
             Generate the appropriate output schema following the system instructions.
         """
 
         # Generate the output schema
-        output_schema = self.llm.generate(model=self.standard_model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.1, top_p=0.9)
+        output_schema = self.llm.generate(model=self.reasoning_model, system_prompt=system_prompt, user_prompt=user_prompt, temperature=0.1, top_p=0.9)
 
         # Store the output schema
         match = re.search(r"```python\n(.*?)```", output_schema, re.DOTALL)

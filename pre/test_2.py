@@ -27,8 +27,8 @@ def get_best_code(path: str, last_epoch: int) -> CodeGenerated:
             generations[cg.code_id] = cg
 
     # for code_id, code_obj in generations.items():
-    #     if code_obj.result is not None and code_obj.result["total_boxes_used"] < 49:
-    #         print(f"{code_obj.solution_type} & {code_obj.epoch} & {code_obj.result["total_boxes_used"]} & {round(code_obj.execution_time, 3)}s")
+    #     if code_obj.result is not None and code_obj.result["total_boxes"] < 49:
+    #         print(f"{code_obj.solution_type} & {code_obj.epoch} & {code_obj.result["total_boxes"]} & {round(code_obj.execution_time, 3)}s")
 
 
     best_codes = []
@@ -37,19 +37,19 @@ def get_best_code(path: str, last_epoch: int) -> CodeGenerated:
         if code_obj.result is not None and code_obj.epoch == last_epoch:
             father = generations[code_obj.father_code_id]
 
-            if father.result["total_boxes_used"] == 0 and code_obj.result["total_boxes_used"] == 0:
+            if father.result["total_boxes"] == 0 and code_obj.result["total_boxes"] == 0:
                 continue
 
-            if father.result["total_boxes_used"] == 0:
+            if father.result["total_boxes"] == 0:
                 best_codes.append(code_obj)
                 continue
-            if code_obj.result["total_boxes_used"] == 0:
+            if code_obj.result["total_boxes"] == 0:
                 best_codes.append(father)
                 continue
 
-            if father.result["total_boxes_used"] < code_obj.result["total_boxes_used"]:
+            if father.result["total_boxes"] < code_obj.result["total_boxes"]:
                 best_codes.append(father)
-            elif father.result["total_boxes_used"] == code_obj.result["total_boxes_used"]:
+            elif father.result["total_boxes"] == code_obj.result["total_boxes"]:
                 if father.execution_time < code_obj.execution_time:
                     best_codes.append(father)
                 else:
@@ -63,7 +63,7 @@ def get_best_code(path: str, last_epoch: int) -> CodeGenerated:
     # table = ""
 
     # for code_obj in best_codes:
-    #     line = f"{code_obj.solution_type} & {code_obj.epoch} & {code_obj.result["total_boxes_used"]} & {round(code_obj.execution_time, 3)}s \\\\"
+    #     line = f"{code_obj.solution_type} & {code_obj.epoch} & {code_obj.result["total_boxes"]} & {round(code_obj.execution_time, 3)}s \\\\"
     #     table += line + "\n"
     # print(table)
 
@@ -74,22 +74,22 @@ def get_best_code(path: str, last_epoch: int) -> CodeGenerated:
     # print("Total Cost:", code_obj.result['total_cost'])
     # print("Execution Time:", code_obj.execution_time)
 
-    best_codes.sort(key=lambda x: (x.result["total_boxes_used"], x.execution_time))
+    best_codes.sort(key=lambda x: (x.result["total_boxes"], x.execution_time))
     return best_codes[0]
 
 
-best_1 = get_best_code("results_binpack1_5_5_individual_best.txt", 5)
-print("-----------------------------")
-best_2 = get_best_code("results_binpack1_5_15_individual_best.txt", 15)
-print("-----------------------------")
-best_3 = get_best_code("results_binpack1_15_5_individual_best.txt", 5)
-print("-----------------------------")
-best_4 = get_best_code("results_binpack1_15_15_individual_best.txt", 15)
+best_1 = get_best_code("results_binpack1_v2_5_5_individual_best.txt", 5)
+# print("-----------------------------")
+# best_2 = get_best_code("results_binpack1_5_15_individual_best.txt", 15)
+# print("-----------------------------")
+# best_3 = get_best_code("results_binpack1_15_5_individual_best.txt", 5)
+# print("-----------------------------")
+# best_4 = get_best_code("results_binpack1_15_15_individual_best.txt", 15)
 
-print(best_1.result["total_boxes_used"])
-print(best_2.result["total_boxes_used"])
-print(best_3.result["total_boxes_used"])
-print(best_4.result["total_boxes_used"])
+print(best_1.result["total_boxes"])
+# print(best_2.result["total_boxes"])
+# print(best_3.result["total_boxes"])
+# print(best_4.result["total_boxes"])
 
 instances_path = [
     "src\\test\\binpack1_instances\\u120_01_49.txt",
@@ -112,16 +112,16 @@ instances_path = [
 
 best_codes = [
     best_1,
-    best_2,
-    best_3,
-    best_4,
+    # best_2,
+    # best_3,
+    # best_4,
 ]
 
 codes_folders = [
-    "src\\test\\binpack1_5_5_individual_best",
-    "src\\test\\binpack1_5_15_individual_best",
-    "src\\test\\binpack1_15_5_individual_best",
-    "src\\test\\binpack1_15_15_individual_best",
+    "src\\test\\binpack1_v2_5_5_individual_best",
+    # "src\\test\\binpack1_5_15_individual_best",
+    # "src\\test\\binpack1_15_5_individual_best",
+    # "src\\test\\binpack1_15_15_individual_best",
 ]
 
 for instance_path in instances_path:
@@ -144,7 +144,7 @@ for instance_path in instances_path:
             instance: {instance_path}
             code type: {best_code.solution_type}
             execution time: {end - start}
-            value: {result_dict['total_boxes_used']}
+            value: {result_dict['total_boxes']}
             -------------------------------------
         """)
     print("##################################################")
