@@ -1,28 +1,27 @@
 import json
 
-def build_reasoner_prompt(context: str, objective: str, constraints: str, inst_format: str) -> str:
+def build_reasoner_prompt(context: str, objective: str, constraints: str) -> str:
     return f"""
-    PROBLEM CONTEXT:
-    {context}
+PROBLEM TO SOLVE:
+{context}
 
-    PROBLEM OBJECTIVE:
-    {objective}
+OBJECTIVE:
+{objective}
 
-    PROBLEM CONSTRAINTS:
-    {constraints}
+CONSTRAINTS:
+{constraints}
 
-    INSTANCE DATA FORMAT:
-    {inst_format}
-
-    Task:
-    List all the key output variables that are necessary to fully represent the expected result of this problem.
-    """
+---
+TASK:
+List all output variables that the solution must contain, following the system rules.
+"""
 
 def build_coder_prompt(variables: str) -> str:
     return f"""
-    VARIABLES DEFINITIONS:
-    {json.dumps(variables, indent = 2)}
+VARIABLES DEFINITIONS:
+{json.dumps(variables, indent = 2)}
 
-    Task:
-    Generate the output schema according to the provided variable definitions.
-    """
+---
+TASK:
+Generate the Python `output_schema` according to the system instructions.
+"""
