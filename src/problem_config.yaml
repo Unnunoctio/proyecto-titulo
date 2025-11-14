@@ -29,11 +29,11 @@ problem:
   constraints: |
     - sum(aji * xi)(i=1, n)>=1, j ∈ {1, 2, ..., m}
     - xi ∈ {0, 1}, i ∈ {1, 2, ..., n}
-  instance-filename: "instance.txt"
+  instance-filename: "instances/instance-base-scp.txt"
   instance-format: |
-    Para una instancia de de 200 elementos (n) y 1000 subconjuntos (m), tenemos la siguiente estructura:
+    Cada instancia debe contener n elementos y m subconjuntos, siguiendo la siguiente estructura:
       
-    Primera parte de la representación
+    Primera parte de la representación (n m)
       200 1000
     - El primer valor indica los elementos del conjunto U, y el segundo indica la cantidad total de subconjuntos. Luego, tenemos:
     

@@ -41,8 +41,8 @@ class PromptManager:
 
     @classmethod
     def get_user_prompt(cls, role: str, name: str, **kwargs) -> str:
-        if role not in ("reasoner", "coder"):
-            raise ValueError(f"Invalid role: {role}")
+        # if role not in ("reasoner", "coder"):
+        #     raise ValueError(f"Invalid role: {role}")
         
         module = cls._load_module(name)
         func_name = f"build_{role}_prompt"

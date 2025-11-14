@@ -7,7 +7,7 @@ class CodeExecutor:
     FOLDER_PATH: str = "generations"
 
     @classmethod
-    def _create_venv(cls):
+    def create_venv(cls):
         try:
             if not os.path.exists(cls.FOLDER_PATH):
                 os.makedirs(cls.FOLDER_PATH)
@@ -113,6 +113,7 @@ class CodeExecutor:
             "fractions",
             "statistics",
             "secrets",
+            "typing"
         }
 
         dependencies_to_install = [dep for dep in dependencies if dep not in builtin_modules]
@@ -201,27 +202,27 @@ class CodeExecutor:
             print(f"Incorrectly installed: {incorrect_installed}")
 
     @classmethod
-    def install_all_dependencies(cls, file_names: List[str]):
+    def install_all_dependencies(cls, file_name: str):
         if not os.path.exists(os.path.join(cls.FOLDER_PATH, "venv")):
-            cls._create_venv()
+            cls.create_venv()
 
-        all_dependencies_to_install = set()
-        for file_name in file_names:
-            with open(os.path.join(cls.FOLDER_PATH, file_name), "r") as f:
-                code = f.read()
-                dependencies = cls._detect_dependencies_regex(code)
-                dependencies_to_install = cls._filter_dependencies_builtin(dependencies)
-                if not dependencies_to_install:
-                    continue
-                
-                not_installed = cls._filter_already_installed(dependencies_to_install)
-                if not not_installed:
-                    continue
+        # all_dependencies_to_install = set()
+        # for file_name in file_names:
+        with open(os.path.join(cls.FOLDER_PATH, file_name), "r") as f:
+            code = f.read()
+            dependencies = cls._detect_dependencies_regex(code)
+            dependencies_to_install = cls._filter_dependencies_builtin(dependencies)
+            if not dependencies_to_install:
+                return
+            
+            not_installed = cls._filter_already_installed(dependencies_to_install)
+            if not not_installed:
+                return
 
-                all_dependencies_to_install.update(not_installed)
+            # all_dependencies_to_install.update(not_installed)
         
-        print(f"Dependencies to install: {all_dependencies_to_install}")
-        cls._install_dependencies(all_dependencies_to_install)
+        print(f"Dependencies to install: {not_installed}")
+        cls._install_dependencies(not_installed)
 
     @classmethod
     def save_code(cls, file_name: str, code: str):
@@ -282,13 +283,13 @@ class CodeExecutor:
     def execute_function_memory(cls, function_code: str, function_name:str, data: Dict):
         try:
             # # Create a namespace for the function
-            # execution_namespace = {}
-            # exec(function_code, globals(), execution_namespace)
+            execution_namespace = {}
+            exec(function_code, {}, execution_namespace)
 
             # # Call the function
-            # result = execution_namespace[function_name](data)
-            exec(function_code, globals())
-            result = globals()[function_name](data)
+            result = execution_namespace[function_name](data)
+            # exec(function_code, globals())
+            # result = globals()[function_name](data)
             return result
         except Exception as e:
             print(f"Error executing function: {e}")

@@ -1,7 +1,11 @@
 import yaml
+import asyncio
+import time
 
-from core.agent.agent import Agent
+from core.agent import Agent
 from core.models import Problem, GenerationConfig
+
+start_time = time.time()
 
 with open("src/problem_config.yaml", "r") as f:
     config = yaml.safe_load(f)
@@ -24,4 +28,6 @@ with open("src/problem_config.yaml", "r") as f:
     )
 
 agent = Agent(problem, generation_config)
-agent.run()
+asyncio.run(agent.run())
+
+print(f"Total time: {time.time() - start_time} seconds")

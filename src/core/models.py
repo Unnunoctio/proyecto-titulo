@@ -30,7 +30,7 @@ class GenerationCode:
     _id: str
     father_id: Optional[str]
     epoch: int
-    version: float # version of the code, starting from 1.0 and incrementing by 0.1 for each new version of the code
+    version: int # version of the code, starting from 1 and incrementing by 1 for each new version of the code
     solution_type: str
     solution_cross: Optional[str]
     code_path: str # path to the code file
