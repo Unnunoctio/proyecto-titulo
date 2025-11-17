@@ -16,7 +16,7 @@ INSTANCE INFORMATION:
 
 ---
 TASK:
-Extract and prioritize ALL constraints following the system instructions.
+Based on the problem description above, extract and prioritize ALL constraints following the system instructions.
 """
 
 def build_coder_prompt(context: str, list_of_constraints: str, result_data_structure: str, instance_path: str, instance_format: str) -> str:
@@ -37,5 +37,5 @@ INSTANCE INFORMATION:
 
 ---
 TASK:
-Generate the complete 'validate_constraints' function according to the system instructions.
+Generate the 'validate_restrictions' function that verifies ALL constraints from the problem description. Following the provided format specification.
 """

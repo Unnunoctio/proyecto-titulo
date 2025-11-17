@@ -45,11 +45,4 @@ INPUT FORMAT (candidate list):
 ---
 TASK:
 Generate the `target_function` that evaluates all solution candidates based on the provided directives and returns the **index (int)** of the best-performing solution in the list.
-
-REQUIREMENTS:
-- Follow all evaluation directives (explicit and implicit).
-- Compare solutions according to the problem's objective.
-- If objective scores are equal, prefer the one with smaller execution time.
-- Include all necessary imports.
-- Output only the complete, executable function code.
 """

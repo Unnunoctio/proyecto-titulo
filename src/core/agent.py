@@ -6,6 +6,7 @@ import asyncio
 import time
 import ast
 from typing import List
+from concurrent.futures import ThreadPoolExecutor
 
 from core.models import Provider, Problem, GenerationConfig, GenerationArtifact, GenerationCode
 from core.providers._base import ProviderBase
@@ -40,6 +41,9 @@ class Agent:
             target_function=None
         )
 
+        # TODO: Initialize the executor pool thread
+        self.EXECUTOR_POOL = ThreadPoolExecutor(max_workers=8)
+
     def _get_provider(self, provider_config: dict) -> ProviderBase:
         if provider_config["provider"] == Provider.OPENAI.value:
             from core.providers.openai import OpenAIProvider
@@ -69,14 +73,26 @@ class Agent:
             if (epoch == 1):
                 # TODO: Generate first generation
                 best_approaches = await self._select_best_approaches()
+                print(f"BEST APPROACHES:")
+                for a in best_approaches:
+                    print(f"-> {a['solution_type']}")
+                print("###########################")
                 # Generate user prompts for each approach
                 user_prompts = [PM.get_user_prompt("coder_generate", "generate_code", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, solution_type=a["solution_type"], solution_plan=a["plan"], output_schema=self.ARTIFACTS.output_schema) for a in best_approaches]
 
                 loop = asyncio.get_event_loop()
-                tasks = [loop.run_in_executor(None, self._generate_solution_code, user_prompts[i], epoch, best_approaches[i]['solution_type'], None, 1, None) for i in range(len(best_approaches)) ]
+                tasks = [loop.run_in_executor(self.EXECUTOR_POOL, self._generate_solution_code, user_prompts[i], epoch, best_approaches[i]['solution_type'], None, 1, None) for i in range(len(best_approaches)) ]
                 
                 current_solutions = await asyncio.gather(*tasks, return_exceptions=False)
-                print(f"Current solutions: {len(current_solutions.filter(lambda x: x is not None))}")
+                count = 0
+                print("###########################")
+                for x in current_solutions:
+                    if x is not None:
+                        count += 1
+                        print(f"Current solution: {x.solution_type}")
+                        print(f"Execution time: {x.execution_time}")
+                        print("--------------")
+                print(f"##########################\nCurrent solutions: {count}")
                 return
             elif (epoch == 2 and self.GENERATION_CONFIG.evo_strategy == "cross"):
                 # TODO: Generate second cross generation
@@ -102,13 +118,9 @@ class Agent:
 
     def _generate_output_schema(self) -> None:
         # TODO: Generate the output schema
-        r_system_prompt = PM.get_system_prompt("reasoner", "output_schema")
-        r_user_prompt = PM.get_user_prompt("reasoner", "output_schema", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints)
-        variables_definitions = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.5, top_p=0.85)
-
         c_system_prompt = PM.get_system_prompt("coder", "output_schema")
-        c_user_prompt = PM.get_user_prompt("coder", "output_schema", variables=variables_definitions)
-        output_schema = self.CODING_MODEL.generate_response(c_system_prompt, c_user_prompt, temperature=0, top_p=1)
+        c_user_prompt = PM.get_user_prompt("coder", "output_schema", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints)
+        output_schema = self.CODING_MODEL.generate_response(c_system_prompt, c_user_prompt, temperature=0.1, top_p=0.95)
 
         # Store the output schema
         match = re.search(r"```python\n(.*?)```", output_schema, re.DOTALL)
@@ -192,6 +204,8 @@ class Agent:
         return plan
     
     def _generate_solution_code(self, user_prompt: str, epoch: int, solution_type: str, solution_cross: str | None, version: int, father_id: str) -> GenerationCode | None:
+        print(f"Generating solution code for {solution_type} - epoch {epoch} - version {version}")
+        
         # Check if the version is greater than the maximum number of errors
         if (version > self.GENERATION_CONFIG.max_errors + 1):
             return None
@@ -255,6 +269,7 @@ class Agent:
             print(f"EJECUCION: {scg.solution_type} has an error: {scg.code_error}")
             print(f"RESULT: {scg.code_output}")
             print("---\n")
+
             # TODO: Fix code
             r_system_prompt = PM.get_system_prompt("reasoner", "fix_code")
             r_user_prompt = PM.get_user_prompt("reasoner", "fix_code", code=solution_code, error=scg.code_error, result=scg.code_output, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, output_schema=self.ARTIFACTS.output_schema)
@@ -265,7 +280,7 @@ class Agent:
 
         # Save the result
         scg.code_output = result_dict
-
+        
         # TODO: Validate the code output to pass a constraints function
         try:
             result, error = CE.execute_function_memory(function_code=self.ARTIFACTS.constraints_function, function_name="validate_constraints", data=scg.code_output)

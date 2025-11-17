@@ -283,13 +283,14 @@ class CodeExecutor:
     def execute_function_memory(cls, function_code: str, function_name:str, data: Dict):
         try:
             # # Create a namespace for the function
-            execution_namespace = {}
-            exec(function_code, {}, execution_namespace)
+            # execution_namespace = {}
+            # exec(function_code, {}, execution_namespace)
 
             # # Call the function
-            result = execution_namespace[function_name](data)
-            # exec(function_code, globals())
-            # result = globals()[function_name](data)
+            # result = execution_namespace[function_name](data)
+            # execution_namespace.clear() # Limpiar la memoria
+            exec(function_code, globals())
+            result = globals()[function_name](data)
             return result
         except Exception as e:
             print(f"Error executing function: {e}")
