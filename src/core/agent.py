@@ -90,7 +90,10 @@ class Agent:
                     if x is not None:
                         count += 1
                         print(f"Current solution: {x.solution_type}")
-                        print(f"Execution time: {x.execution_time}")
+                        print(f"Version: {x.version}")
+                        print(f"Execution time: {x.code_time}")
+                        if (x.code_output["total_cost"] is not None):
+                            print(f"Total Cost: {x.code_output["total_cost"]}")
                         print("--------------")
                 print(f"##########################\nCurrent solutions: {count}")
                 return
