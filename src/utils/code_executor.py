@@ -1,7 +1,7 @@
 import os
 import re
 import subprocess
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Any
 
 class CodeExecutor:
     FOLDER_PATH: str = "generations"
@@ -225,6 +225,12 @@ class CodeExecutor:
         cls._install_dependencies(not_installed)
 
     @classmethod
+    def create_folder(cls, folder_name: str):
+        folder_path = os.path.join(cls.FOLDER_PATH, folder_name)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
+    @classmethod
     def save_code(cls, file_name: str, code: str):
         try:
             if not os.path.exists(cls.FOLDER_PATH):
@@ -280,7 +286,7 @@ class CodeExecutor:
             return None, Exception(f"Unexpected error executing code: {file_name}: {e}")
 
     @classmethod
-    def execute_function_memory(cls, function_code: str, function_name:str, data: Dict):
+    def execute_function_memory(cls, function_code: str, function_name:str, data: Any):
         try:
             # # Create a namespace for the function
             # execution_namespace = {}

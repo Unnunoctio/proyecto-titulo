@@ -6,9 +6,10 @@ import asyncio
 import time
 import ast
 from typing import List
+from dataclasses import asdict
 from concurrent.futures import ThreadPoolExecutor
 
-from core.models import Provider, Problem, GenerationConfig, GenerationArtifact, GenerationCode
+from core.models import Provider, Problem, GenerationConfig, GenerationArtifact, GenerationCode, DataclassJSONEncoder
 from core.providers._base import ProviderBase
 from utils.prompt_manager import PromptManager as PM
 from utils.code_executor import CodeExecutor as CE
@@ -32,7 +33,7 @@ class Agent:
         # TODO: Initialize the generations
         self._ID = str(uuid.uuid4())
         self.GENERATIONS = dict()
-        self.BEST_GENERATION = None
+        # self.BEST_GENERATION = None
 
         # TODO: Initialize the artifacts
         self.ARTIFACTS = GenerationArtifact(
@@ -42,7 +43,7 @@ class Agent:
         )
 
         # TODO: Initialize the executor pool thread
-        self.EXECUTOR_POOL = ThreadPoolExecutor(max_workers=8)
+        self.EXECUTOR_POOL = ThreadPoolExecutor(max_workers=5)
 
     def _get_provider(self, provider_config: dict) -> ProviderBase:
         if provider_config["provider"] == Provider.OPENAI.value:
@@ -59,6 +60,11 @@ class Agent:
             raise Exception(f"Unknown provider: {provider_config['provider']}")
         
     async def run(self):
+        print(f"Starting Agent, ID: {self._ID}")
+        CE.create_folder(self._ID)
+        CE.create_folder(f"{self._ID}/artifacts")
+        CE.create_folder(f"{self._ID}/generations")
+
         print("Generating artifacts...")
         self._generate_output_schema()
         self._generate_constraints_function()
@@ -67,57 +73,99 @@ class Agent:
         print("Generating solutions...")
         CE.create_venv()
 
-        # best_solutions = []
+        best_solutions = []
         for epoch in range(1, self.GENERATION_CONFIG.max_epochs + 1):
+            current_solutions = []
+
             # TODO: GENERATE CODE GENERATION
             if (epoch == 1):
                 # TODO: Generate first generation
                 best_approaches = await self._select_best_approaches()
-                print(f"BEST APPROACHES:")
-                for a in best_approaches:
-                    print(f"-> {a['solution_type']}")
-                print("###########################")
                 # Generate user prompts for each approach
                 user_prompts = [PM.get_user_prompt("coder_generate", "generate_code", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, solution_type=a["solution_type"], solution_plan=a["plan"], output_schema=self.ARTIFACTS.output_schema) for a in best_approaches]
 
                 loop = asyncio.get_event_loop()
-                tasks = [loop.run_in_executor(self.EXECUTOR_POOL, self._generate_solution_code, user_prompts[i], epoch, best_approaches[i]['solution_type'], None, 1, None) for i in range(len(best_approaches)) ]
+                tasks = [loop.run_in_executor(self.EXECUTOR_POOL, self._generate_solution_code, user_prompts[i], epoch, best_approaches[i]['solution_type'], None, 1, None) for i in range(len(best_approaches))]
                 
                 current_solutions = await asyncio.gather(*tasks, return_exceptions=False)
-                count = 0
-                print("###########################")
-                for x in current_solutions:
-                    if x is not None:
-                        count += 1
-                        print(f"Current solution: {x.solution_type}")
-                        print(f"Version: {x.version}")
-                        print(f"Execution time: {x.code_time}")
-                        if (x.code_output["total_cost"] is not None):
-                            print(f"Total Cost: {x.code_output["total_cost"]}")
-                        print("--------------")
-                print(f"##########################\nCurrent solutions: {count}")
-                return
             elif (epoch == 2 and self.GENERATION_CONFIG.evo_strategy == "cross"):
                 # TODO: Generate second cross generation
                 pass
             else:
                 # TODO: Generate next evolution generation
-                pass
-            
+                # Get Evo planning
+                evo_plans = [self._generate_evolution_plan(s) for s in best_solutions]
+                # Get User prompt for each evo plan
+                user_prompts = [PM.get_user_prompt("coder_evo", "generate_code", code = CE.get_code(file_name=best_solutions[i].code_path), improvement_plan = evo_plans[i]) for i in range(len(best_solutions))]
+                # Generate code for each user prompt
+                loop = asyncio.get_event_loop()
+                tasks = [loop.run_in_executor(self.EXECUTOR_POOL, self._generate_solution_code, user_prompts[i], epoch, best_solutions[i].solution_type, best_solutions[i].solution_cross, 1, best_solutions[i]._id) for i in range(len(best_solutions))]
+
+                current_solutions = await asyncio.gather(*tasks, return_exceptions=False)
+
             # TODO: EVALUATE CODE GENERATION
             if (epoch == 1):
                 # all
-                pass
+                best_solutions = [s for s in current_solutions if s is not None]
+                if (len(best_solutions) == 0):
+                    print("-------- NO SOLUTIONS FOUND --------")
+                    break
             elif (epoch == 2 and self.GENERATION_CONFIG.evo_strategy == "cross"):
                 # pre and all
                 pass
             else:
                 # select best solutions (father and son)
-                pass
-        
-        print("Select best solution")
-        # TODO: SELECT BEST SOLUTION
+                for i in range(len(best_solutions)):
+                    if (current_solutions[i] is None):
+                        continue
 
+                    data = [
+                        { "result": best_solutions[i].code_output, "execution_time": best_solutions[i].code_time},
+                        { "result": current_solutions[i].code_output, "execution_time": current_solutions[i].code_time}
+                    ]
+
+                    best_index = CE.execute_function_memory(function_code=self.ARTIFACTS.target_function, function_name="target_function", data=data)
+                    if best_index == 1:
+                        # print("Best Solution is a Child")
+                        best_solutions[i] = current_solutions[i]
+                    # elif best_index == 0:
+                    #     print("Best Solution is a Father")
+                    # else:
+                    #     print("Best Solution is a None")
+                    # print("-------------------------------------------")
+        
+        # TODO: SELECT BEST SOLUTION
+        print("Select best solution...")
+        data = []
+        for s in best_solutions:
+            data.append({ "result": s.code_output, "execution_time": s.code_time})
+        best_solution_index = CE.execute_function_memory(function_code=self.ARTIFACTS.target_function, function_name="target_function", data=data)
+        
+        print("---------------- SOLUTIONS ----------------")
+        for s in best_solutions:
+            print("-----------------------------------------------")
+            print(f"Solution Type: {s.solution_type}")
+            print(f"\tTotal Cost: {s.code_output['total_cost']}")
+            print(f"\tExecution Time: {s.code_time}")
+            print(f"\tEpoch: {s.epoch}")
+            print(f"\tVersion: {s.version}")
+            print("-----------------------------------------------")
+        
+        print("\n-----------------------------------------------")
+        print("---------------- BEST SOLUTION ----------------")
+        print(f"Solution Type: {best_solutions[best_solution_index].solution_type}")
+        print(f"\tTotal Cost: {best_solutions[best_solution_index].code_output['total_cost']}")
+        print(f"\tExecution Time: {best_solutions[best_solution_index].code_time}")
+        print(f"\tEpoch: {best_solutions[best_solution_index].epoch}")
+        print(f"\tVersion: {best_solutions[best_solution_index].version}")
+        print("-----------------------------------------------")
+
+        # TODO: Save all data to a JSON file
+        CE.save_code(file_name=f"{self._ID}/problem.json", code=json.dumps(asdict(self.PROBLEM), indent=4))
+        CE.save_code(file_name=f"{self._ID}/generation_config.json", code=json.dumps(asdict(self.GENERATION_CONFIG), indent=4))
+        CE.save_code(file_name=f"{self._ID}/generations.json", code=json.dumps({k: asdict(v) for k, v in self.GENERATIONS.items()}, indent=4, cls=DataclassJSONEncoder))
+        CE.save_code(file_name=f"{self._ID}/best_solutions.json", code=json.dumps([asdict(s) for s in best_solutions], indent=4, cls=DataclassJSONEncoder))
+        CE.save_code(file_name=f"{self._ID}/best_solution.json", code=json.dumps(asdict(best_solutions[best_solution_index]), indent=4, cls=DataclassJSONEncoder))
 
     def _generate_output_schema(self) -> None:
         # TODO: Generate the output schema
@@ -132,7 +180,8 @@ class Agent:
         self.ARTIFACTS.output_schema = code
 
         # Save the output schema in the generations folder
-        CE.save_code(file_name="output_schema.py", code=code)
+        path = f"{self._ID}/artifacts/output_schema.py"
+        CE.save_code(file_name=path, code=code)
 
     def _generate_constraints_function(self) -> None:
         # TODO: Generate the constraints function
@@ -151,7 +200,8 @@ class Agent:
         self.ARTIFACTS.constraints_function = code
 
         # Save the constraints function
-        CE.save_code(file_name="constraints_function.py", code=code)
+        path = f"{self._ID}/artifacts/constraints_function.py"
+        CE.save_code(file_name=path, code=code)
 
     def _generate_target_function(self) -> None:
         # TODO: Generate the target function
@@ -177,7 +227,8 @@ class Agent:
         self.ARTIFACTS.target_function = code
 
         # Save the target function
-        CE.save_code(file_name="target_function.py", code=code)
+        path = f"{self._ID}/artifacts/target_function.py"
+        CE.save_code(file_name=path, code=code)
     
     async def _select_best_approaches(self) -> List[dict]:
         # TODO: Generate the best approaches
@@ -227,7 +278,8 @@ class Agent:
         
         # Store the solution code
         path = f"{solution_type.lower().replace(' ', '_').replace('*', '_star')}_e{epoch}_{'none' if solution_cross is None else solution_cross.lower().replace(' ', '_').replace('*', '_star')}_v{version}.py"
-        
+        path = f"{self._ID}/generations/{path}"
+
         scg = GenerationCode( # Solution Code Generated
             _id=str(uuid.uuid4()),
             father_id=father_id,
@@ -307,3 +359,12 @@ class Agent:
         # TODO: Return the solution code
         return scg
         
+    def _generate_evolution_plan(self, solution: GenerationCode) -> str:
+        # TODO: Generate the evolution plan
+        code = CE.get_code(file_name=solution.code_path)
+
+        r_system_prompt = PM.get_system_prompt("reasoner", "plan_evolution")
+        r_user_prompt = PM.get_user_prompt("reasoner", "plan_evolution", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, solution_type=solution.solution_type, code=code)
+        plan = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.3, top_p=0.95)
+
+        return plan

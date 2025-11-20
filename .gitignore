@@ -5,7 +5,7 @@ test/
 # Generation Files
 output/*.py
 instances/*.py
-generations/*.py
+generations/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

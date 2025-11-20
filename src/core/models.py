@@ -1,6 +1,7 @@
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
+import json
 
 class Provider(Enum):
     OPENAI = "OPENAI"
@@ -43,3 +44,9 @@ class GenerationArtifact:
     output_schema: Optional[str] # schema of the output
     constraints_function: Optional[str] # function that checks if the output satisfies the constraints
     target_function: Optional[str] # function that checks if the output is the target
+
+class DataclassJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Exception):
+            return str(obj)
+        return super().default(obj)
