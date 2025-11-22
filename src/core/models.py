@@ -49,4 +49,20 @@ class DataclassJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Exception):
             return str(obj)
+        if isinstance(obj, tuple):
+            return str(obj)  # o list(obj) si prefieres arrays
         return super().default(obj)
+    
+    def encode(self, obj):
+        # Convierte recursivamente todas las tuplas-clave a strings
+        def convert_keys(o):
+            if isinstance(o, dict):
+                return {str(k) if isinstance(k, tuple) else k: convert_keys(v) 
+                        for k, v in o.items()}
+            elif isinstance(o, list):
+                return [convert_keys(item) for item in o]
+            elif isinstance(o, tuple):
+                return str(o)  # o list(o)
+            return o
+        
+        return super().encode(convert_keys(obj))

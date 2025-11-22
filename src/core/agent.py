@@ -5,6 +5,7 @@ import json
 import asyncio
 import time
 import ast
+import gc
 from typing import List
 from dataclasses import asdict
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +32,7 @@ class Agent:
         self.GENERATION_CONFIG = generation_config
 
         # TODO: Initialize the generations
-        self._ID = str(uuid.uuid4())
+        self._ID = f"jsp-{str(uuid.uuid4())}"
         self.GENERATIONS = dict()
         # self.BEST_GENERATION = None
 
@@ -141,29 +142,29 @@ class Agent:
             data.append({ "result": s.code_output, "execution_time": s.code_time})
         best_solution_index = CE.execute_function_memory(function_code=self.ARTIFACTS.target_function, function_name="target_function", data=data)
         
-        print("---------------- SOLUTIONS ----------------")
-        for s in best_solutions:
-            print("-----------------------------------------------")
-            print(f"Solution Type: {s.solution_type}")
-            print(f"\tTotal Cost: {s.code_output['total_cost']}")
-            print(f"\tExecution Time: {s.code_time}")
-            print(f"\tEpoch: {s.epoch}")
-            print(f"\tVersion: {s.version}")
-            print("-----------------------------------------------")
+        # print("---------------- SOLUTIONS ----------------")
+        # for s in best_solutions:
+        #     print("-----------------------------------------------")
+        #     print(f"Solution Type: {s.solution_type}")
+        #     print(f"\tTotal Cost: {s.code_output['total_cost']}")
+        #     print(f"\tExecution Time: {s.code_time}")
+        #     print(f"\tEpoch: {s.epoch}")
+        #     print(f"\tVersion: {s.version}")
+        #     print("-----------------------------------------------")
         
-        print("\n-----------------------------------------------")
-        print("---------------- BEST SOLUTION ----------------")
-        print(f"Solution Type: {best_solutions[best_solution_index].solution_type}")
-        print(f"\tTotal Cost: {best_solutions[best_solution_index].code_output['total_cost']}")
-        print(f"\tExecution Time: {best_solutions[best_solution_index].code_time}")
-        print(f"\tEpoch: {best_solutions[best_solution_index].epoch}")
-        print(f"\tVersion: {best_solutions[best_solution_index].version}")
-        print("-----------------------------------------------")
+        # print("\n-----------------------------------------------")
+        # print("---------------- BEST SOLUTION ----------------")
+        # print(f"Solution Type: {best_solutions[best_solution_index].solution_type}")
+        # print(f"\tTotal Cost: {best_solutions[best_solution_index].code_output['total_cost']}")
+        # print(f"\tExecution Time: {best_solutions[best_solution_index].code_time}")
+        # print(f"\tEpoch: {best_solutions[best_solution_index].epoch}")
+        # print(f"\tVersion: {best_solutions[best_solution_index].version}")
+        # print("-----------------------------------------------")
 
         # TODO: Save all data to a JSON file
         CE.save_code(file_name=f"{self._ID}/problem.json", code=json.dumps(asdict(self.PROBLEM), indent=4))
         CE.save_code(file_name=f"{self._ID}/generation_config.json", code=json.dumps(asdict(self.GENERATION_CONFIG), indent=4))
-        CE.save_code(file_name=f"{self._ID}/generations.json", code=json.dumps({k: asdict(v) for k, v in self.GENERATIONS.items()}, indent=4, cls=DataclassJSONEncoder))
+        CE.save_code(file_name=f"{self._ID}/generations.json", code=json.dumps({str(k): asdict(v) for k, v in self.GENERATIONS.items()}, indent=4, cls=DataclassJSONEncoder))
         CE.save_code(file_name=f"{self._ID}/best_solutions.json", code=json.dumps([asdict(s) for s in best_solutions], indent=4, cls=DataclassJSONEncoder))
         CE.save_code(file_name=f"{self._ID}/best_solution.json", code=json.dumps(asdict(best_solutions[best_solution_index]), indent=4, cls=DataclassJSONEncoder))
 
@@ -262,6 +263,7 @@ class Agent:
         
         # Check if the version is greater than the maximum number of errors
         if (version > self.GENERATION_CONFIG.max_errors + 1):
+            gc.collect()
             return None
         
         # TODO: Generate the solution code
@@ -331,6 +333,7 @@ class Agent:
             fix_plan = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.5, top_p=0.9)
             
             fix_user_prompt = PM.get_user_prompt("coder_fix", "generate_code", code=solution_code, error=scg.code_error, fix_plan=fix_plan, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, output_schema=self.ARTIFACTS.output_schema)
+            gc.collect()
             return self._generate_solution_code(fix_user_prompt, epoch, solution_type, solution_cross, version + 1, father_id)
 
         # Save the result
@@ -352,11 +355,13 @@ class Agent:
                 fix_plan = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.5, top_p=0.9)
                 
                 fix_user_prompt = PM.get_user_prompt("coder_fix", "generate_code", code=solution_code, error=scg.code_error, fix_plan=fix_plan, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, output_schema=self.ARTIFACTS.output_schema)
+                gc.collect()
                 return self._generate_solution_code(fix_user_prompt, epoch, solution_type, solution_cross, version + 1, father_id)
         except Exception as e:
             print(f"Error executing constraints function: {e}")
 
         # TODO: Return the solution code
+        gc.collect()
         return scg
         
     def _generate_evolution_plan(self, solution: GenerationCode) -> str:

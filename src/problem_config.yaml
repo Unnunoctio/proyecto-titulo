@@ -13,74 +13,61 @@ agents:
 
 problem:
   context: |
-    Para el SCP, tenemos un conjunto de n elementos al que llamaremos U, y una cantidad de m subconjuntos a los que llamaremos S_i, con i = {1, 2, 3, ..., m}, donde queremos una unión de subconjuntos S, tal que el costo total de esos subconjuntos sea el mínimo y todos los elementos de U estén cubiertos por al menos un subconjunto S. En base a esto podemos formular el siguiente modelo:
-    
-    Parámetros:
-      n: Número de elementos en U.
-      m: Número de subconjuntos.
-      ci: costo del subconjunto Si.
-      aji: indica si el elemento j se encuentra en el subconjunto i.
+    El Job Shop Problem es NP-hard. Existen \(n\) trabajos \(J=\{1,\dots,n\}\). Cada trabajo \(j\) consta de una secuencia ordenada de \(n_j\) operaciones indexadas por \(r=1,\dots,n_j\). La operación \(r\) del trabajo \(j\) se ejecuta en una máquina determinada \(o_{j,r}\in M\) y requiere un tiempo de procesamiento \(p_{j,r}>0\).
 
-    Variable de decisión:
-      xi: Variable binaria que indica si el subconjunto Si es parte de la solución (1 si es que forma parte, 0 en caso contrario).
+    Parámetros
+    \begin{itemize}
+      \item \(J=\{1,\dots,n\}\): conjunto de trabajos.
+      \item \(M=\{1,\dots,m\}\): conjunto de máquinas.
+      \item \(o_{j,r}\in M\): máquina que procesa la operación \(r\) del trabajo \(j\).
+      \item \(p_{j,r}>0\): tiempo de procesamiento de la operación \(r\) del trabajo \(j\).
+      \item \(A\) (o \(M\_big\)) : constante Big-M suficientemente grande (por ejemplo, la suma de todos los \(p_{j,r}\)).
+    \end{itemize}
+
+    Variables de decisión
+    \begin{itemize}
+      \item \(S_{j,r}\ge 0\): tiempo de inicio de la operación \(r\) del trabajo \(j\).
+      \item \(y_{j,r,k,s}\in\{0,1\}\): variable binaria que vale 1 si la operación \((j,r)\) precede en la máquina a la operación \((k,s)\) (es decir, si en la misma máquina \((j,r)\) se programa antes que \((k,s)\)).
+      \item \(C\ge 0\): makespan (tiempo máximo de finalización).
+    \end{itemize}
+
   objective: |
-    Minimizar el costo total de los subconjuntos S.
-      Minimizar: sum(ci * xi)
+    \min\ C
+
   constraints: |
-    - sum(aji * xi)(i=1, n)>=1, j ∈ {1, 2, ..., m}
-    - xi ∈ {0, 1}, i ∈ {1, 2, ..., n}
-  instance-filename: "instances/instance-base-scp.txt"
+    - Precedencia dentro de un trabajo (orden de operaciones del mismo trabajo):
+      S_{j,r} \ge S_{j,r-1} + p_{j,r-1}\qquad \forall j\in J,\; r=2,\dots,n_j
+
+    - Conflicto en máquinas (disyuntivas para operaciones que comparten la misma máquina): para cualquier par de operaciones \((j,r)\neq (k,s)\) tales que \(o_{j,r}=o_{k,s}\)
+      S_{j,r} \ge S_{k,s} + p_{k,s} - A\cdot y_{j,r,k,s}
+      S_{k,s} \ge S_{j,r} + p_{j,r} - A\cdot (1 - y_{j,r,k,s})
+
+      Estas dos desigualdades obligan a que una de las operaciones comience después de que termine la otra.
+    
+    - Cálculo del makespan:
+      C \ge S_{j,r} + p_{j,r}\qquad \forall j\in J,\; r=1,\dots,n_j.
+
+    - Dominio
+      S_{j,r} \ge 0,\quad C \ge 0,\quad y_{j,r,k,s}\in\{0,1\}.
+  
+  instance-filename: "instances/instance-base-jsp.txt"
   instance-format: |
-    Cada instancia debe contener n elementos y m subconjuntos, siguiendo la siguiente estructura:
-      
-    Primera parte de la representación (n m)
-      200 1000
-    - El primer valor indica los elementos del conjunto U, y el segundo indica la cantidad total de subconjuntos. Luego, tenemos:
-    
-    Segunda parte de la representación
-      1 1 1 1 1 1 1 1 1 1 1 1
-      2 2 2 2 2 2 2 2 2 2 2 2
-      2 2 2 3 3 3 3 3 3 3 3 3
-      3 3 3 3 3 3 4 4 4 4 4 4
-      4 4 4 4 4 4 4 4 5 5 5 5
-      5 5 5 5 5 6 6 6 6 6 6 6
-      6 6 6 6 7 7 7 7 7 7 7 7
-      7 7 7 8 8 8 8 8 8 8 8 8
-      8 9 9 9 9 9 9 9 9 10 10 10
-      10 10 10 10 10 10 11 11 11 11 11 11
-      11 12 12 12 12 12 12 12 12 12 12 12
-      12 12 12 13 13 13 13 13 13 13 13 14
-      14 14 14 14 14 14 14 14 14 14 14 14
-      14 15 15 15 15 15 15 15 15 15 15 15
-      15 15 15 15 15 16 16 16 16 16 16 17
-      17 17 17 17 18 18 18 18 18 18 18 18
-      18 18 18 18 18 19 19 19 19 19 19 19
-      20 20 20 20 20 20 20 20 20 20 20 20
-      20 21 21 21 21 21 21 21 21 22 22 22
-      22 22 22 22 22 22 22 23 23 23 23 23
-      23 23 23 23 23 23 24 24 24 24 24 24
-      ... 100
-    - La segunda parte del archivo muestra los costos c_i de cada subconjunto S_i, en este caso, 1000 valores. Por último, se muestra lo siguiente:
-    
-    Tercera parte de la representación
-      17
-      91 214 230 289 351 416 488 491 518 567 720 721
-      735 753 768 928 990
-      18
-      22 47 99 192 299 322 340 500 619 628 640 663
-      709 736 796 844 930 970
-      26
-      2 37 56 115 151 160 178 182 218 228 345 388
-      587 588 607 614 629 635 636 673 757 793 800 849
-      873 929
-    - Para la tercera parte del archivo, estamos viendo los primeros 3 elementos del conjunto U, y lo que nos indica el archivo es lo siguiente:
-      * Para el primer elemento, la fila que contiene un solo valor indica que el elemento esta cubierto por 17 subconjuntos.
-      * Luego de eso, vienen 17 valores que indican cuales son los subconjuntos que contienen el primer elemento.
-      * Para el segundo y tercer elemento, indica que aparecen en 18 y 26 subconjuntos respectivamente.
-      * Y además muestran los subconjuntos correspondientes a cada elemento.
+    Each instance consists of a line of description, a line containing the 
+    number of jobs and the number of machines, and then one line for each job,
+    listing the machine number and processing time for each step of the job. 
+    The machines are numbered starting with 0.
+
+    Example:
+    6 6
+    2  1  0  3  1  6  3  7  5  3  4  6
+    1  8  2  5  4 10  5 10  0 10  3  4
+    2  5  3  4  5  8  0  9  1  1  4  7
+    1  5  0  5  2  5  3  3  4  8  5  9 
+    2  9  1  3  4  5  5  4  0  3  3  1
+    1  3  3  3  5  9  0 10  4  4  2  1
 
 generation:
-  first-generation-size: 5
+  first-generation-size: 15
   max-epochs: 15
   evolution-strategy: "individual" # "individual" | "cross"
   selection-strategy: "best" # "best" | "random"

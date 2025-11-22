@@ -1,0 +1,88 @@
+agents:
+  coding-model:
+    provider: OPENAI
+    config:
+      api-key: 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
+      model: gpt-4.1
+      
+  planning-model:
+    provider: OPENAI
+    config:
+      api-key: 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
+      model: gpt-4o
+
+problem:
+  context: |
+    Para el SCP, tenemos un conjunto de n elementos al que llamaremos U, y una cantidad de m subconjuntos a los que llamaremos S_i, con i = {1, 2, 3, ..., m}, donde queremos una unión de subconjuntos S, tal que el costo total de esos subconjuntos sea el mínimo y todos los elementos de U estén cubiertos por al menos un subconjunto S. En base a esto podemos formular el siguiente modelo:
+    
+    Parámetros:
+      n: Número de elementos en U.
+      m: Número de subconjuntos.
+      ci: costo del subconjunto Si.
+      aji: indica si el elemento j se encuentra en el subconjunto i.
+
+    Variable de decisión:
+      xi: Variable binaria que indica si el subconjunto Si es parte de la solución (1 si es que forma parte, 0 en caso contrario).
+  objective: |
+    Minimizar el costo total de los subconjuntos S.
+      Minimizar: sum(ci * xi)
+  constraints: |
+    - sum(aji * xi)(i=1, n)>=1, j ∈ {1, 2, ..., m}
+    - xi ∈ {0, 1}, i ∈ {1, 2, ..., n}
+  instance-filename: "instances/instance-base-scp.txt"
+  instance-format: |
+    Cada instancia debe contener n elementos y m subconjuntos, siguiendo la siguiente estructura:
+      
+    Primera parte de la representación (n m)
+      200 1000
+    - El primer valor indica los elementos del conjunto U, y el segundo indica la cantidad total de subconjuntos. Luego, tenemos:
+    
+    Segunda parte de la representación
+      1 1 1 1 1 1 1 1 1 1 1 1
+      2 2 2 2 2 2 2 2 2 2 2 2
+      2 2 2 3 3 3 3 3 3 3 3 3
+      3 3 3 3 3 3 4 4 4 4 4 4
+      4 4 4 4 4 4 4 4 5 5 5 5
+      5 5 5 5 5 6 6 6 6 6 6 6
+      6 6 6 6 7 7 7 7 7 7 7 7
+      7 7 7 8 8 8 8 8 8 8 8 8
+      8 9 9 9 9 9 9 9 9 10 10 10
+      10 10 10 10 10 10 11 11 11 11 11 11
+      11 12 12 12 12 12 12 12 12 12 12 12
+      12 12 12 13 13 13 13 13 13 13 13 14
+      14 14 14 14 14 14 14 14 14 14 14 14
+      14 15 15 15 15 15 15 15 15 15 15 15
+      15 15 15 15 15 16 16 16 16 16 16 17
+      17 17 17 17 18 18 18 18 18 18 18 18
+      18 18 18 18 18 19 19 19 19 19 19 19
+      20 20 20 20 20 20 20 20 20 20 20 20
+      20 21 21 21 21 21 21 21 21 22 22 22
+      22 22 22 22 22 22 22 23 23 23 23 23
+      23 23 23 23 23 23 24 24 24 24 24 24
+      ... 100
+    - La segunda parte del archivo muestra los costos c_i de cada subconjunto S_i, en este caso, 1000 valores. Por último, se muestra lo siguiente:
+    
+    Tercera parte de la representación
+      17
+      91 214 230 289 351 416 488 491 518 567 720 721
+      735 753 768 928 990
+      18
+      22 47 99 192 299 322 340 500 619 628 640 663
+      709 736 796 844 930 970
+      26
+      2 37 56 115 151 160 178 182 218 228 345 388
+      587 588 607 614 629 635 636 673 757 793 800 849
+      873 929
+    - Para la tercera parte del archivo, estamos viendo los primeros 3 elementos del conjunto U, y lo que nos indica el archivo es lo siguiente:
+      * Para el primer elemento, la fila que contiene un solo valor indica que el elemento esta cubierto por 17 subconjuntos.
+      * Luego de eso, vienen 17 valores que indican cuales son los subconjuntos que contienen el primer elemento.
+      * Para el segundo y tercer elemento, indica que aparecen en 18 y 26 subconjuntos respectivamente.
+      * Y además muestran los subconjuntos correspondientes a cada elemento.
+
+generation:
+  first-generation-size: 15
+  max-epochs: 15
+  evolution-strategy: "individual" # "individual" | "cross"
+  selection-strategy: "best" # "best" | "random"
+  timeout: 30 # seconds
+  max-errors: 5 # max number of errors resolved in a single generation
