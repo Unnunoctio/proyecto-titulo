@@ -7,7 +7,7 @@ from llm_models.class_llm import LLM
 
 class Openia_LLM(LLM):
     def __init__(self):
-        self.API_KEY = "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"
+        self.API_KEY = "YOUR-API-KEY"
         self.MODEL_MINI = "gpt-4.1-mini"
         self.MODEL_STANDARD = "gpt-4.1"
         self.MODEL_REASONING_MINI = "gpt-4o-mini"
