@@ -7,7 +7,9 @@ from core.models import Problem, GenerationConfig
 
 start_time = time.time()
 
-with open("src/problem_config.yaml", "r") as f:
+problem_path = "src/problem_config.yaml"
+
+with open(problem_path, "r") as f:
     config = yaml.safe_load(f)
 
     problem = Problem(

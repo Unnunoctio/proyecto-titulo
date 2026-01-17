@@ -80,7 +80,7 @@ problem:
       * Y además muestran los subconjuntos correspondientes a cada elemento.
 
 generation:
-  first-generation-size: 15
+  first-generation-size: 5
   max-epochs: 15
   evolution-strategy: "individual" # "individual" | "cross"
   selection-strategy: "best" # "best" | "random"

@@ -32,7 +32,7 @@ class Agent:
         self.GENERATION_CONFIG = generation_config
 
         # TODO: Initialize the generations
-        self._ID = f"jsp-{str(uuid.uuid4())}"
+        self._ID = f"{str(uuid.uuid4())}"
         self.GENERATIONS = dict()
         # self.BEST_GENERATION = None
 
@@ -75,6 +75,7 @@ class Agent:
         CE.create_venv()
 
         best_solutions = []
+        best_current_solution = {}
         for epoch in range(1, self.GENERATION_CONFIG.max_epochs + 1):
             current_solutions = []
 
@@ -95,7 +96,7 @@ class Agent:
             else:
                 # TODO: Generate next evolution generation
                 # Get Evo planning
-                evo_plans = [self._generate_evolution_plan(s) for s in best_solutions]
+                evo_plans = [self._generate_evolution_plan(s, best_current_solution) for s in best_solutions]
                 # Get User prompt for each evo plan
                 user_prompts = [PM.get_user_prompt("coder_evo", "generate_code", code = CE.get_code(file_name=best_solutions[i].code_path), improvement_plan = evo_plans[i]) for i in range(len(best_solutions))]
                 # Generate code for each user prompt
@@ -127,13 +128,14 @@ class Agent:
 
                     best_index = CE.execute_function_memory(function_code=self.ARTIFACTS.target_function, function_name="target_function", data=data)
                     if best_index == 1:
-                        # print("Best Solution is a Child")
                         best_solutions[i] = current_solutions[i]
-                    # elif best_index == 0:
-                    #     print("Best Solution is a Father")
-                    # else:
-                    #     print("Best Solution is a None")
-                    # print("-------------------------------------------")
+            
+            # TODO: SELECT BEST CURRENT SOLUTION
+            data = []
+            for s in best_solutions:
+                data.append({ "result": s.code_output, "execution_time": s.code_time})
+            best_current_index = CE.execute_function_memory(function_code=self.ARTIFACTS.target_function, function_name="target_function", data=data)
+            best_current_solution = best_solutions[best_current_index]
         
         # TODO: SELECT BEST SOLUTION
         print("Select best solution...")
@@ -189,6 +191,9 @@ class Agent:
         r_system_prompt = PM.get_system_prompt("reasoner", "constraints_function")
         r_user_prompt = PM.get_user_prompt("reasoner", "constraints_function", context=self.PROBLEM.context, constraints=self.PROBLEM.constraints, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format)
         constraints_list = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.4, top_p=0.9)
+        print("-----")
+        print(constraints_list)
+        print("-----")
 
         c_system_prompt = PM.get_system_prompt("coder", "constraints_function")
         c_user_prompt = PM.get_user_prompt("coder", "constraints_function", context=self.PROBLEM.context, list_of_constraints=constraints_list, result_data_structure=self.ARTIFACTS.output_schema, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format)
@@ -217,6 +222,10 @@ class Agent:
         r_user_prompt = PM.get_user_prompt("reasoner", "target_function", context=self.PROBLEM.context, objective=self.PROBLEM.objective, input_data_structure=input_data_structure)
         evaluation_directives = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.5, top_p=0.85)
 
+        print("-----")
+        print(evaluation_directives)
+        print("-----")
+
         c_system_prompt = PM.get_system_prompt("coder", "target_function")
         c_user_prompt = PM.get_user_prompt("coder", "target_function", context=self.PROBLEM.context, objective=self.PROBLEM.objective, evaluation_directives=evaluation_directives, input_data_structure=input_data_structure)
         target_function = self.CODING_MODEL.generate_response(c_system_prompt, c_user_prompt, temperature=0, top_p=1)
@@ -236,6 +245,9 @@ class Agent:
         r_system_prompt = PM.get_system_prompt("reasoner", "select_approaches")
         r_user_prompt = PM.get_user_prompt("reasoner", "select_approaches", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints, num_methods=self.GENERATION_CONFIG.first_gen_size)
         best_approaches = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.55, top_p=0.9)
+        print("-----")
+        print(best_approaches)
+        print("-----")
 
         # Get a list of the text
         match = re.search(r"```python\n(.*?)```", best_approaches, re.DOTALL)
@@ -247,6 +259,10 @@ class Agent:
         loop = asyncio.get_event_loop()
         tasks = [loop.run_in_executor(None, self._plan_approach, a["solution_type"]) for a in best_approaches_list]
         plannes = await asyncio.gather(*tasks, return_exceptions=False)
+        for p in plannes:
+            print("----PLANES-----")
+            print(p)
+            print("-----")
         
         return [{"solution_type": a[0]["solution_type"], "plan": a[1]} for a in zip(best_approaches_list, plannes)]
 
@@ -364,12 +380,12 @@ class Agent:
         gc.collect()
         return scg
         
-    def _generate_evolution_plan(self, solution: GenerationCode) -> str:
+    def _generate_evolution_plan(self, solution: GenerationCode, best_current_solution: GenerationCode) -> str:
         # TODO: Generate the evolution plan
         code = CE.get_code(file_name=solution.code_path)
 
         r_system_prompt = PM.get_system_prompt("reasoner", "plan_evolution")
-        r_user_prompt = PM.get_user_prompt("reasoner", "plan_evolution", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, solution_type=solution.solution_type, code=code)
+        r_user_prompt = PM.get_user_prompt("reasoner", "plan_evolution", context=self.PROBLEM.context, objective=self.PROBLEM.objective, constraints=self.PROBLEM.constraints, instance_path=self.PROBLEM.inst_filename, instance_format=self.PROBLEM.inst_format, solution_type=solution.solution_type, code=code, current_solution=solution.code_output, best_solution=best_current_solution.code_output)
         plan = self.PLANNING_MODEL.generate_response(r_system_prompt, r_user_prompt, temperature=0.3, top_p=0.95)
 
         return plan
